@@ -102,19 +102,15 @@ class SensorStreamingActivity : AppSystemActivity() {
 
       // --- BEHAVIORAL INTERACTION DETECTION ---
       // Joint IDs for FULL_BODY: 7=Head, 20=L Palm, 44=R Palm, 8=L Shoulder
-      val headJointValid = headJoint != null && (headJoint.flags and JointPose.ValidBits != 0)
-      val leftHandJoint = jointPoses.getOrNull(20)
-      val rightHandJoint = jointPoses.getOrNull(44)
-      val leftShoulderJoint = jointPoses.getOrNull(8)
+      val headJointValid = headJoint?.let { isPoseTracked(it) } == true
+      val leftHandJoint = jointPoses.getOrNull(20)?.takeIf { isPoseTracked(it) }
+      val rightHandJoint = jointPoses.getOrNull(44)?.takeIf { isPoseTracked(it) }
+      val leftShoulderJoint = jointPoses.getOrNull(8)?.takeIf { isPoseTracked(it) }
 
-      val leftHandValid = leftHandJoint != null && (leftHandJoint.flags and JointPose.ValidBits != 0)
-      val rightHandValid = rightHandJoint != null && (rightHandJoint.flags and JointPose.ValidBits != 0)
-      val leftShoulderValid = leftShoulderJoint != null && (leftShoulderJoint.flags and JointPose.ValidBits != 0)
-
-      if (headJointValid && leftHandValid && rightHandValid && leftShoulderValid) {
-        val leftHandPos = leftHandJoint!!.pose.t
-        val rightHandPos = rightHandJoint!!.pose.t
-        val leftShoulderPos = leftShoulderJoint!!.pose.t
+      if (headJointValid && leftHandJoint != null && rightHandJoint != null && leftShoulderJoint != null) {
+        val leftHandPos = leftHandJoint.pose.t
+        val rightHandPos = rightHandJoint.pose.t
+        val leftShoulderPos = leftShoulderJoint.pose.t
 
         // 1. Body State: Crouching vs Standing
         val isCrouching = headPos.y < 1.1f && headPos.y > 0.1f
@@ -131,12 +127,10 @@ class SensorStreamingActivity : AppSystemActivity() {
         val isArmExtended = leftArmLen > 0.55f
 
         // 5. Gesture: Pinch Detection (Heuristic based on Thumb/Index Tip proximity)
-        val lThumbJoint = jointPoses.getOrNull(24)
-        val lIndexJoint = jointPoses.getOrNull(28)
+        val lThumbJoint = jointPoses.getOrNull(24)?.takeIf { isPoseTracked(it) }
+        val lIndexJoint = jointPoses.getOrNull(28)?.takeIf { isPoseTracked(it) }
         val isPinching =
-            if (lThumbJoint != null && lIndexJoint != null &&
-                (lThumbJoint.flags and JointPose.ValidBits != 0) &&
-                (lIndexJoint.flags and JointPose.ValidBits != 0)) {
+            if (lThumbJoint != null && lIndexJoint != null) {
                 (lThumbJoint.pose.t - lIndexJoint.pose.t).length() < 0.03f
             } else false
 
@@ -229,5 +223,14 @@ class SensorStreamingActivity : AppSystemActivity() {
   override fun onDestroy() {
     scene.releaseBodyTrackingBuffers()
     super.onDestroy()
+  }
+
+  private fun isPoseTracked(pose: ControllerPose): Boolean {
+    val requiredBits =
+        JointPose.LocationValidBit or
+            JointPose.LocationTrackedBit or
+            JointPose.OrientationValidBit or
+            JointPose.OrientationTrackedBit
+    return (pose.flags and requiredBits) == requiredBits
   }
 }
