@@ -9,12 +9,14 @@ package com.meta.spatial.samples.sensorstreaming
 
 import android.net.Uri
 import android.os.Bundle
+import android.widget.TextView
 import com.meta.spatial.core.Color4
 import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Quaternion
 import com.meta.spatial.core.SpatialFeature
 import com.meta.spatial.core.SpatialSDKExperimentalAPI
+import com.meta.spatial.core.Vector2
 import com.meta.spatial.core.Vector3
 import com.meta.spatial.runtime.BodyTrackingFidelity
 import com.meta.spatial.runtime.ControllerPose
@@ -26,6 +28,9 @@ import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.Box
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
+import com.meta.spatial.toolkit.Panel
+import com.meta.spatial.toolkit.PanelDimensions
+import com.meta.spatial.toolkit.PanelRegistration
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.vr.VRFeature
 
@@ -34,8 +39,14 @@ class SensorStreamingActivity : AppSystemActivity() {
   // Cubes to represent the skeleton bones
   private var boneCubes: MutableList<Entity> = mutableListOf()
 
+  // Debug overlay
+  private var debugTextView: TextView? = null
+
   // Sensor data manager for structured tracking data
   private val sensorDataManager = SensorDataManager()
+
+  // Overlay entity
+  private var overlayEntity: Entity? = null
 
   // Variables for body tracking
   private var skeletonChangedCount = -1
@@ -48,6 +59,19 @@ class SensorStreamingActivity : AppSystemActivity() {
 
   override fun registerFeatures(): List<SpatialFeature> {
     return listOf(VRFeature(this))
+  }
+
+  override fun registerPanels(): List<PanelRegistration> {
+    return listOf(
+        PanelRegistration(DEBUG_PANEL_ID).view { context ->
+          TextView(context).apply {
+            setTextColor(android.graphics.Color.WHITE)
+            setBackgroundColor(android.graphics.Color.RED)
+            textSize = 20f
+            text = "Sensor Overlay"
+            debugTextView = this
+          }
+        })
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -100,6 +124,17 @@ class SensorStreamingActivity : AppSystemActivity() {
       val gazeOrigin = headPos
       val gazeDir = headRot * Vector3(0f, 0f, -1f) // -Z is forward in OpenXR direction
 
+      // Create overlay in front of user once tracking starts
+      if (overlayEntity == null && headPos != Vector3(0f, 0f, 0f)) {
+        overlayEntity =
+            Entity.create(
+                listOf(
+                    Panel(DEBUG_PANEL_ID),
+                    Mesh(Uri.parse("mesh://quad")),
+                    Transform(Pose(headPos + (headRot * Vector3(0f, 0f, -1.2f)))),
+                    PanelDimensions(Vector2(0.6f, 0.4f))))
+      }
+
       // --- BEHAVIORAL INTERACTION DETECTION ---
       // Joint IDs for FULL_BODY: 7=Head, 20=L Palm, 44=R Palm, 8=L Shoulder
       val headJointValid = headJoint?.let { isPoseTracked(it) } == true
@@ -148,6 +183,7 @@ class SensorStreamingActivity : AppSystemActivity() {
       val frameData =
           sensorDataManager.assembleFrame(jointPoses, headPos, headRot, gazeOrigin, gazeDir)
       sensorDataManager.streamFrameData(frameData)
+      updateOverlay(frameData)
 
       // Check if we need to to create or update the skeleton
       if (scene.getSkeletonChangedCount() != skeletonChangedCount) {
@@ -232,5 +268,30 @@ class SensorStreamingActivity : AppSystemActivity() {
             JointPose.OrientationValidBit or
             JointPose.OrientationTrackedBit
     return (pose.flags and requiredBits) == requiredBits
+  }
+
+  private var lastOverlayUpdate = 0L
+
+  private fun updateOverlay(frameData: FrameData) {
+    val now = System.currentTimeMillis()
+    if (now - lastOverlayUpdate < 250) return // Update at 4Hz
+    lastOverlayUpdate = now
+
+    val text =
+        """
+        Sensor Stream
+        Head→Left: ${"%.2f".format(frameData.depthEstimate.headToLeftHand)} m
+        Head→Right: ${"%.2f".format(frameData.depthEstimate.headToRightHand)} m
+        Hand→Hand: ${"%.2f".format(frameData.depthEstimate.handToHand)} m
+        FPS: ${"%.1f".format(frameData.fps)}
+        Memory: ${frameData.memoryMb} MB
+    """
+            .trimIndent()
+
+    runOnUiThread { debugTextView?.text = text }
+  }
+
+  companion object {
+    private const val DEBUG_PANEL_ID = 1001
   }
 }
