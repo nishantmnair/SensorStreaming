@@ -9,14 +9,12 @@ package com.meta.spatial.samples.sensorstreaming
 
 import android.net.Uri
 import android.os.Bundle
-import android.widget.TextView
 import com.meta.spatial.core.Color4
 import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Quaternion
 import com.meta.spatial.core.SpatialFeature
 import com.meta.spatial.core.SpatialSDKExperimentalAPI
-import com.meta.spatial.core.Vector2
 import com.meta.spatial.core.Vector3
 import com.meta.spatial.runtime.BodyTrackingFidelity
 import com.meta.spatial.runtime.ControllerPose
@@ -28,9 +26,7 @@ import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.Box
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
-import com.meta.spatial.toolkit.Panel
-import com.meta.spatial.toolkit.PanelDimensions
-import com.meta.spatial.toolkit.PanelRegistration
+import com.meta.spatial.toolkit.Scale
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.vr.VRFeature
 
@@ -39,14 +35,13 @@ class SensorStreamingActivity : AppSystemActivity() {
   // Cubes to represent the skeleton bones
   private var boneCubes: MutableList<Entity> = mutableListOf()
 
-  // Debug overlay
-  private var debugTextView: TextView? = null
+  // Debug visualization bars
+  private var barHeadLeft: Entity? = null
+  private var barHeadRight: Entity? = null
+  private var barHandHand: Entity? = null
 
   // Sensor data manager for structured tracking data
   private val sensorDataManager = SensorDataManager()
-
-  // Overlay entity
-  private var overlayEntity: Entity? = null
 
   // Variables for body tracking
   private var skeletonChangedCount = -1
@@ -59,19 +54,6 @@ class SensorStreamingActivity : AppSystemActivity() {
 
   override fun registerFeatures(): List<SpatialFeature> {
     return listOf(VRFeature(this))
-  }
-
-  override fun registerPanels(): List<PanelRegistration> {
-    return listOf(
-        PanelRegistration(DEBUG_PANEL_ID).view { context ->
-          TextView(context).apply {
-            setTextColor(android.graphics.Color.WHITE)
-            setBackgroundColor(android.graphics.Color.RED)
-            textSize = 20f
-            text = "Sensor Overlay"
-            debugTextView = this
-          }
-        })
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -124,17 +106,6 @@ class SensorStreamingActivity : AppSystemActivity() {
       val gazeOrigin = headPos
       val gazeDir = headRot * Vector3(0f, 0f, -1f) // -Z is forward in OpenXR direction
 
-      // Create overlay in front of user once tracking starts
-      if (overlayEntity == null && headPos != Vector3(0f, 0f, 0f)) {
-        overlayEntity =
-            Entity.create(
-                listOf(
-                    Panel(DEBUG_PANEL_ID),
-                    Mesh(Uri.parse("mesh://quad")),
-                    Transform(Pose(headPos + (headRot * Vector3(0f, 0f, -1.2f)))),
-                    PanelDimensions(Vector2(0.6f, 0.4f))))
-      }
-
       // --- BEHAVIORAL INTERACTION DETECTION ---
       // Joint IDs for FULL_BODY: 7=Head, 20=L Palm, 44=R Palm, 8=L Shoulder
       val headJointValid = headJoint?.let { isPoseTracked(it) } == true
@@ -183,7 +154,7 @@ class SensorStreamingActivity : AppSystemActivity() {
       val frameData =
           sensorDataManager.assembleFrame(jointPoses, headPos, headRot, gazeOrigin, gazeDir)
       sensorDataManager.streamFrameData(frameData)
-      updateOverlay(frameData)
+      updateDebugBars(frameData, headPos, headRot)
 
       // Check if we need to to create or update the skeleton
       if (scene.getSkeletonChangedCount() != skeletonChangedCount) {
@@ -270,28 +241,42 @@ class SensorStreamingActivity : AppSystemActivity() {
     return (pose.flags and requiredBits) == requiredBits
   }
 
-  private var lastOverlayUpdate = 0L
+  /**
+   * Simple 3D bar visualization for debug data.
+   * Bars grow/shrink based on computed distances.
+   */
+  private fun updateDebugBars(frameData: FrameData, headPos: Vector3, headRot: Quaternion) {
+    if (headPos == Vector3(0f, 0f, 0f)) return
 
-  private fun updateOverlay(frameData: FrameData) {
-    val now = System.currentTimeMillis()
-    if (now - lastOverlayUpdate < 250) return // Update at 4Hz
-    lastOverlayUpdate = now
+    if (barHeadLeft == null) {
+      barHeadLeft = createDebugBar(Color4(1f, 0f, 0f, 1f)) // Red
+      barHeadRight = createDebugBar(Color4(0f, 1f, 0f, 1f)) // Green
+      barHandHand = createDebugBar(Color4(1f, 1f, 0f, 1f)) // Yellow
+    }
 
-    val text =
-        """
-        Sensor Stream
-        Head→Left: ${"%.2f".format(frameData.depthEstimate.headToLeftHand)} m
-        Head→Right: ${"%.2f".format(frameData.depthEstimate.headToRightHand)} m
-        Hand→Hand: ${"%.2f".format(frameData.depthEstimate.handToHand)} m
-        FPS: ${"%.1f".format(frameData.fps)}
-        Memory: ${frameData.memoryMb} MB
-    """
-            .trimIndent()
+    val forward = headRot * Vector3(0f, 0f, -1.2f)
+    val right = headRot * Vector3(0.3f, 0f, 0f)
+    val basePos = headPos + forward - right // Left-align the bars
 
-    runOnUiThread { debugTextView?.text = text }
+    updateBarTransform(barHeadLeft, basePos + (headRot * Vector3(0f, 0.1f, 0f)), headRot, frameData.depthEstimate.headToLeftHand)
+    updateBarTransform(barHeadRight, basePos, headRot, frameData.depthEstimate.headToRightHand)
+    updateBarTransform(barHandHand, basePos + (headRot * Vector3(0f, -0.1f, 0f)), headRot, frameData.depthEstimate.handToHand)
   }
 
-  companion object {
-    private const val DEBUG_PANEL_ID = 1001
+  private fun createDebugBar(color: Color4): Entity {
+    return Entity.create(
+        listOf(
+            Mesh(Uri.parse("mesh://box")),
+            Material().apply { baseColor = color },
+            Transform(Pose(Vector3(0f, 0f, 0f), Quaternion(0f, 0f, 0f, 1f))),
+            Box(Vector3(0f, -0.01f, -0.01f), Vector3(1f, 0.01f, 0.01f)) // 1m default length
+        )
+    )
+  }
+
+  private fun updateBarTransform(entity: Entity?, pos: Vector3, rot: Quaternion, length: Float) {
+    val safeLength = Math.max(0.001f, length)
+    entity?.setComponent(Transform(Pose(pos, rot)))
+    entity?.setComponent(Scale(Vector3(safeLength, 1f, 1f)))
   }
 }
