@@ -242,25 +242,28 @@ class SensorStreamingActivity : AppSystemActivity() {
   }
 
   /**
-   * Simple 3D bar visualization for debug data.
-   * Bars grow/shrink based on computed distances.
+   * Simple 3D bar visualization for debug data at a fixed location.
+   * Bars grow/shrink based on computed distances by updating Box dimensions.
    */
   private fun updateDebugBars(frameData: FrameData, headPos: Vector3, headRot: Quaternion) {
-    if (headPos == Vector3(0f, 0f, 0f)) return
-
+    // Note: Removed headPos check to ensure bars render even if tracking is shaky
     if (barHeadLeft == null) {
+      android.util.Log.d("DEBUG_BARS", "DEBUG_BARS created")
       barHeadLeft = createDebugBar(Color4(1f, 0f, 0f, 1f)) // Red
       barHeadRight = createDebugBar(Color4(0f, 1f, 0f, 1f)) // Green
       barHandHand = createDebugBar(Color4(1f, 1f, 0f, 1f)) // Yellow
     }
 
-    val forward = headRot * Vector3(0f, 0f, -1.2f)
-    val right = headRot * Vector3(0.3f, 0f, 0f)
-    val basePos = headPos + forward - right // Left-align the bars
+    // Fixed world-space location for visibility verification
+    val baseX = -0.4f
+    val baseY = 1.4f
+    val baseZ = -1.2f
 
-    updateBarTransform(barHeadLeft, basePos + (headRot * Vector3(0f, 0.1f, 0f)), headRot, frameData.depthEstimate.headToLeftHand)
-    updateBarTransform(barHeadRight, basePos, headRot, frameData.depthEstimate.headToRightHand)
-    updateBarTransform(barHandHand, basePos + (headRot * Vector3(0f, -0.1f, 0f)), headRot, frameData.depthEstimate.handToHand)
+    android.util.Log.d("DEBUG_BARS", "DEBUG_BARS updated")
+
+    updateBarTransform(barHeadLeft, Vector3(baseX, baseY + 0.10f, baseZ), frameData.depthEstimate.headToLeftHand)
+    updateBarTransform(barHeadRight, Vector3(baseX, baseY, baseZ), frameData.depthEstimate.headToRightHand)
+    updateBarTransform(barHandHand, Vector3(baseX, baseY - 0.10f, baseZ), frameData.depthEstimate.handToHand)
   }
 
   private fun createDebugBar(color: Color4): Entity {
@@ -269,14 +272,14 @@ class SensorStreamingActivity : AppSystemActivity() {
             Mesh(Uri.parse("mesh://box")),
             Material().apply { baseColor = color },
             Transform(Pose(Vector3(0f, 0f, 0f), Quaternion(0f, 0f, 0f, 1f))),
-            Box(Vector3(0f, -0.01f, -0.01f), Vector3(1f, 0.01f, 0.01f)) // 1m default length
+            Box(Vector3(0f, -0.025f, -0.015f), Vector3(0.5f, 0.025f, 0.015f))
         )
     )
   }
 
-  private fun updateBarTransform(entity: Entity?, pos: Vector3, rot: Quaternion, length: Float) {
-    val safeLength = Math.max(0.001f, length)
-    entity?.setComponent(Transform(Pose(pos, rot)))
-    entity?.setComponent(Scale(Vector3(safeLength, 1f, 1f)))
+  private fun updateBarTransform(entity: Entity?, pos: Vector3, length: Float) {
+    val clampedLength = length.coerceIn(0.2f, 0.8f)
+    entity?.setComponent(Transform(Pose(pos, Quaternion(0f, 0f, 0f, 1f))))
+    entity?.setComponent(Box(Vector3(0f, -0.025f, -0.015f), Vector3(clampedLength, 0.025f, 0.015f)))
   }
 }
