@@ -86,6 +86,10 @@ class SensorDataManager {
     private var lastFpsUpdate: Long = 0
     private var frameCount: Int = 0
 
+    // Throttling state
+    private var lastStreamTime: Long = 0
+    private val streamIntervalMs: Long = 100 // Throttled to 10Hz
+
     /**
      * Mapping from Joint ID to human-readable names.
      * This mapping follows the standard XR_META_body_tracking_full_body joint convention.
@@ -141,9 +145,14 @@ class SensorDataManager {
         // --- DEPTH APPROXIMATION LOGIC ---
         // Raw depth maps are unavailable. We compute Euclidean distance between 
         // the head (ID 7) and palm joints (IDs 20, 44) to estimate depth interaction.
-        val headPoseObj = jointPoses.getOrNull(7)?.pose?.t
-        val leftHandPoseObj = jointPoses.getOrNull(20)?.pose?.t
-        val rightHandPoseObj = jointPoses.getOrNull(44)?.pose?.t
+        // We ensure joints are actually tracked before calculating distances.
+        val headJoint = jointPoses.getOrNull(7)?.takeIf { isPoseTracked(it) }
+        val leftHandJoint = jointPoses.getOrNull(20)?.takeIf { isPoseTracked(it) }
+        val rightHandJoint = jointPoses.getOrNull(44)?.takeIf { isPoseTracked(it) }
+
+        val headPoseObj = headJoint?.pose?.t
+        val leftHandPoseObj = leftHandJoint?.pose?.t
+        val rightHandPoseObj = rightHandJoint?.pose?.t
 
         val depthEstimate = DepthEstimateData(
             headToLeftHand = if (headPoseObj != null && leftHandPoseObj != null) (headPoseObj - leftHandPoseObj).length() else 0f,
@@ -172,6 +181,10 @@ class SensorDataManager {
     }
 
     private fun updateFps(currentTime: Long) {
+        if (lastFpsUpdate == 0L) {
+            lastFpsUpdate = currentTime
+            return
+        }
         frameCount++
         if (currentTime - lastFpsUpdate >= 1000) {
             currentFps = (frameCount * 1000f) / (currentTime - lastFpsUpdate)
@@ -185,8 +198,12 @@ class SensorDataManager {
 
     /**
      * Unified JSON streaming under the "SENSOR_STREAM" tag.
+     * Throttled to prevent flooding Logcat.
      */
     fun streamFrameData(frame: FrameData) {
+        if (System.currentTimeMillis() - lastStreamTime < streamIntervalMs) return
+        lastStreamTime = System.currentTimeMillis()
+
         val json = """{
             "timestamp": ${frame.timestamp},
             "fps": ${"%.1f".format(frame.fps)},
