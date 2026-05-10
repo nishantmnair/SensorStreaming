@@ -80,6 +80,15 @@ class SensorStreamingActivity : AppSystemActivity() {
     // Essential: Initialize body tracking configuration
     scene.setBodyTrackingJointSet(JointSet.FULL_BODY)
     scene.setBodyTrackingFidelity(BodyTrackingFidelity.HIGH)
+
+    // BRUTE FORCE VISIBILITY TEST: One giant red cube at a fixed position
+    Entity.create(
+        listOf(
+            Mesh(Uri.parse("mesh://box")),
+            Material().apply { baseColor = Color4(1f, 0f, 0f, 1f) },
+            Transform(Pose(Vector3(0f, 1.5f, -1.5f))),
+            Box(Vector3(-0.25f, -0.25f, -0.25f), Vector3(0.25f, 0.25f, 0.25f))))
+    android.util.Log.d("DEBUG_MARKER", "created red test cube")
   }
 
   @OptIn(SpatialSDKExperimentalAPI::class)
@@ -154,7 +163,6 @@ class SensorStreamingActivity : AppSystemActivity() {
       val frameData =
           sensorDataManager.assembleFrame(jointPoses, headPos, headRot, gazeOrigin, gazeDir)
       sensorDataManager.streamFrameData(frameData)
-      updateDebugBars(frameData, headPos, headRot)
 
       // Check if we need to to create or update the skeleton
       if (scene.getSkeletonChangedCount() != skeletonChangedCount) {
