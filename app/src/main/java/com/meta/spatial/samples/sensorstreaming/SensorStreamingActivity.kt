@@ -242,10 +242,12 @@ class SensorStreamingActivity : AppSystemActivity() {
   }
 
   /**
-   * Simple 3D bar visualization for debug data at a fixed location.
-   * Bars grow/shrink based on computed distances by updating Box dimensions.
+   * HUD-style 3D bar visualization.
+   * Bars are locked 1.2m in front of the user and expand to the right.
    */
   private fun updateDebugBars(frameData: FrameData, headPos: Vector3, headRot: Quaternion) {
+    if (headPos == Vector3(0f, 0f, 0f)) return
+
     if (barHeadLeft == null) {
       android.util.Log.d("DEBUG_BARS", "DEBUG_BARS created")
       barHeadLeft = createDebugBar(Color4(1f, 0f, 0f, 1f)) // Red
@@ -253,16 +255,17 @@ class SensorStreamingActivity : AppSystemActivity() {
       barHandHand = createDebugBar(Color4(1f, 1f, 0f, 1f)) // Yellow
     }
 
-    // Centered location in front of the user's start position
-    val baseX = 0.0f
-    val baseY = 1.4f
-    val baseZ = -1.2f
+    // Centered HUD: Place bars 1.2m in front of the user's head
+    val forward = headRot * Vector3(0f, 0f, -1.2f)
+    val leftOffset = headRot * Vector3(-0.4f, -0.2f, 0f) // Start bars to the left
+    val basePos = headPos + forward + leftOffset
 
-    android.util.Log.d("DEBUG_BARS", "DEBUG_BARS updated - L:${frameData.depthEstimate.headToLeftHand} R:${frameData.depthEstimate.headToRightHand} H:${frameData.depthEstimate.handToHand}")
+    // Log numerical values for distance tracking
+    android.util.Log.i("DEBUG_BARS", "Distances: L:${"%.2f".format(frameData.depthEstimate.headToLeftHand)}m, R:${"%.2f".format(frameData.depthEstimate.headToRightHand)}m, H:${"%.2f".format(frameData.depthEstimate.handToHand)}m")
 
-    updateBarTransform(barHeadLeft, Vector3(baseX, baseY + 0.10f, baseZ), frameData.depthEstimate.headToLeftHand)
-    updateBarTransform(barHeadRight, Vector3(baseX, baseY, baseZ), frameData.depthEstimate.headToRightHand)
-    updateBarTransform(barHandHand, Vector3(baseX, baseY - 0.10f, baseZ), frameData.depthEstimate.handToHand)
+    updateBarTransform(barHeadLeft, basePos + (headRot * Vector3(0f, 0.15f, 0f)), headRot, frameData.depthEstimate.headToLeftHand)
+    updateBarTransform(barHeadRight, basePos, headRot, frameData.depthEstimate.headToRightHand)
+    updateBarTransform(barHandHand, basePos + (headRot * Vector3(0f, -0.15f, 0f)), headRot, frameData.depthEstimate.handToHand)
   }
 
   private fun createDebugBar(color: Color4): Entity {
@@ -271,16 +274,17 @@ class SensorStreamingActivity : AppSystemActivity() {
             Mesh(Uri.parse("mesh://box")),
             Material().apply { baseColor = color },
             Transform(Pose(Vector3(0f, 0f, 0f), Quaternion(0f, 0f, 0f, 1f))),
-            Box(Vector3(-0.25f, -0.025f, -0.015f), Vector3(0.25f, 0.025f, 0.015f))
+            Scale(Vector3(1f, 1f, 1f)),
+            // Base box is 1m long, starting at 0 and extending to 1.0 in X
+            Box(Vector3(0f, -0.02f, -0.05f), Vector3(1.0f, 0.02f, 0.05f))
         )
     )
   }
 
-  private fun updateBarTransform(entity: Entity?, pos: Vector3, length: Float) {
-    val clampedLength = length.coerceIn(0.2f, 0.8f)
-    // Centering the box visually by offsetting the min/max X based on half the length
-    val halfLen = clampedLength / 2f
-    entity?.setComponent(Transform(Pose(pos, Quaternion(0f, 0f, 0f, 1f))))
-    entity?.setComponent(Box(Vector3(-halfLen, -0.025f, -0.015f), Vector3(halfLen, 0.025f, 0.015f)))
+  private fun updateBarTransform(entity: Entity?, pos: Vector3, rot: Quaternion, length: Float) {
+    val clampedLength = length.coerceIn(0.01f, 2.0f)
+    entity?.setComponent(Transform(Pose(pos, rot)))
+    // Using Scale for stable visual updates; the Box component defines the base shape
+    entity?.setComponent(Scale(Vector3(clampedLength, 1f, 1f)))
   }
 }
