@@ -1,0 +1,36 @@
+# Android Studio / IntelliJ
+*.iml
+.gradle
+.kotlin
+.idea
+*.ipr
+*.iws
+/out/
+
+# Android
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+/captures
+.externalNativeBuild
+.cxx
+/build
+
+# Build results
+**/build/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Mobile
+*.apk
+*.ap_
+*.dex
+
+# Log files
+*.log
