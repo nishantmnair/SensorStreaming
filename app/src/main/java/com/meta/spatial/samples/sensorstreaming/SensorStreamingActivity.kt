@@ -26,7 +26,6 @@ import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.Box
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
-import com.meta.spatial.toolkit.MeshCollision
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.vr.VRFeature
 
@@ -103,43 +102,53 @@ class SensorStreamingActivity : AppSystemActivity() {
 
       // --- BEHAVIORAL INTERACTION DETECTION ---
       // Joint IDs for FULL_BODY: 7=Head, 20=L Palm, 44=R Palm, 8=L Shoulder
-      val leftHandPos = jointPoses.getOrNull(20)?.pose?.t ?: Vector3(0f, 0f, 0f)
-      val rightHandPos = jointPoses.getOrNull(44)?.pose?.t ?: Vector3(0f, 0f, 0f)
-      val leftShoulderPos = jointPoses.getOrNull(8)?.pose?.t ?: Vector3(0f, 0f, 0f)
+      val headJointValid = headJoint != null && (headJoint.flags and JointPose.ValidBits != 0)
+      val leftHandJoint = jointPoses.getOrNull(20)
+      val rightHandJoint = jointPoses.getOrNull(44)
+      val leftShoulderJoint = jointPoses.getOrNull(8)
 
-      // 1. Body State: Crouching vs Standing
-      // Height < 1.1m is typically a crouched position in VR (ReferenceSpace is LOCAL_FLOOR).
-      val isCrouching = headPos.y < 1.1f && headPos.y > 0.1f
+      val leftHandValid = leftHandJoint != null && (leftHandJoint.flags and JointPose.ValidBits != 0)
+      val rightHandValid = rightHandJoint != null && (rightHandJoint.flags and JointPose.ValidBits != 0)
+      val leftShoulderValid = leftShoulderJoint != null && (leftShoulderJoint.flags and JointPose.ValidBits != 0)
 
-      // 2. Gesture: Hands Above Head
-      val isHandRaised = (leftHandPos.y > headPos.y + 0.1f) || (rightHandPos.y > headPos.y + 0.1f)
+      if (headJointValid && leftHandValid && rightHandValid && leftShoulderValid) {
+        val leftHandPos = leftHandJoint!!.pose.t
+        val rightHandPos = rightHandJoint!!.pose.t
+        val leftShoulderPos = leftShoulderJoint!!.pose.t
 
-      // 3. Gesture: Hands Close Together (Clapping or joined hands)
-      val distBetweenHands = (leftHandPos - rightHandPos).length()
-      val isHandsClose = distBetweenHands < 0.15f && distBetweenHands > 0.01f
+        // 1. Body State: Crouching vs Standing
+        val isCrouching = headPos.y < 1.1f && headPos.y > 0.1f
 
-      // 4. Body State: Arm Extension (Reaching out)
-      val leftArmLen = (leftHandPos - leftShoulderPos).length()
-      val isArmExtended = leftArmLen > 0.55f
+        // 2. Gesture: Hands Above Head
+        val isHandRaised = (leftHandPos.y > headPos.y + 0.1f) || (rightHandPos.y > headPos.y + 0.1f)
 
-      // 5. Gesture: Pinch Detection (Heuristic based on Thumb/Index Tip proximity)
-      // Joint indices: 24=L Thumb Tip, 28=L Index Tip (from FULL_BODY mapping)
-      val lThumbTip = jointPoses.getOrNull(24)?.pose?.t
-      val lIndexTip = jointPoses.getOrNull(28)?.pose?.t
-      val isPinching =
-          if (lThumbTip != null && lIndexTip != null) (lThumbTip - lIndexTip).length() < 0.03f
-          else false
+        // 3. Gesture: Hands Close Together (Clapping or joined hands)
+        val distBetweenHands = (leftHandPos - rightHandPos).length()
+        val isHandsClose = distBetweenHands < 0.15f && distBetweenHands > 0.01f
 
-      // Log detected behaviors for analytics or interaction feedback
-      if (isCrouching)
-          android.util.Log.i(
-              "INTERACTION", "STATE: [CROUCHING] HeadHeight: ${"%.2f".format(headPos.y)}m")
-      if (isHandRaised) android.util.Log.i("INTERACTION", "EVENT: [HAND_RAISED]")
-      if (isHandsClose) android.util.Log.i("INTERACTION", "EVENT: [HANDS_JOINED]")
-      if (isPinching) android.util.Log.i("INTERACTION", "EVENT: [PINCH_DETECTED]")
-      if (isArmExtended)
-          android.util.Log.i(
-              "INTERACTION", "STATE: [ARM_EXTENDED] Len: ${"%.2f".format(leftArmLen)}m")
+        // 4. Body State: Arm Extension (Reaching out)
+        val leftArmLen = (leftHandPos - leftShoulderPos).length()
+        val isArmExtended = leftArmLen > 0.55f
+
+        // 5. Gesture: Pinch Detection (Heuristic based on Thumb/Index Tip proximity)
+        val lThumbJoint = jointPoses.getOrNull(24)
+        val lIndexJoint = jointPoses.getOrNull(28)
+        val isPinching =
+            if (lThumbJoint != null && lIndexJoint != null &&
+                (lThumbJoint.flags and JointPose.ValidBits != 0) &&
+                (lIndexJoint.flags and JointPose.ValidBits != 0)) {
+                (lThumbJoint.pose.t - lIndexJoint.pose.t).length() < 0.03f
+            } else false
+
+        // Log detected behaviors for analytics or interaction feedback
+        if (isCrouching)
+            android.util.Log.i("INTERACTION", "STATE: [CROUCHING] HeadHeight: ${"%.2f".format(headPos.y)}m")
+        if (isHandRaised) android.util.Log.i("INTERACTION", "EVENT: [HAND_RAISED]")
+        if (isHandsClose) android.util.Log.i("INTERACTION", "EVENT: [HANDS_JOINED]")
+        if (isPinching) android.util.Log.i("INTERACTION", "EVENT: [PINCH_DETECTED]")
+        if (isArmExtended)
+            android.util.Log.i("INTERACTION", "STATE: [ARM_EXTENDED] Len: ${"%.2f".format(leftArmLen)}m")
+      }
 
       // Assemble all sensor data into a unified frame and stream it
       val frameData =
@@ -164,7 +173,7 @@ class SensorStreamingActivity : AppSystemActivity() {
           val p0 = fromJoint.pose.t
           val p1 = toJoint.pose.t
           val d = p1 - p0
-          var h = d.length()
+          val h = d.length()
 
           val look = Quaternion.lookRotation(d.normalize())
 
@@ -209,7 +218,7 @@ class SensorStreamingActivity : AppSystemActivity() {
 
             val look = Quaternion.lookRotation(d.normalize())
 
-            boneCubes[i - 2].setComponent(Transform(Pose(p0, look)))
+            boneCubes.getOrNull(i - 2)?.setComponent(Transform(Pose(p0, look)))
           }
         }
       }

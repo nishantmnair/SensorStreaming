@@ -20,5 +20,5 @@ Raw camera access and raw depth maps are not exposed through the standard Spatia
 4. View the live sensor data in Logcat using the filter `tag:SENSOR_STREAM`.
 5. Performance stats are logged under `tag:SENSOR_PERF`.
 
-## Demo
-The app renders a 3D skeleton visualization in the headset and streams structured JSON sensor data to the logs for external analysis.
+## Performance Profiling
+The app logs FPS and memory usage during runtime. Additional CPU, memory, and network profiling can be captured using Android Studio Profiler while the app runs on the headset.
