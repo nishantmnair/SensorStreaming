@@ -10,6 +10,14 @@ Android/Meta Quest Pro app that streams body tracking, head pose, gaze approxima
 - **Depth estimate**: Euclidean distance between head-to-hand and hand-to-hand joints.
 - **Performance**: Real-time FPS and memory usage metrics.
 
+## In-Headset Visualization
+The app renders three colored 3D bars in the headset to demonstrate the live depth approximation values:
+- **Red bar**: Head to Left Hand distance
+- **Green bar**: Head to Right Hand distance
+- **Yellow bar**: Hand to Hand distance
+
+These bars update in real time as the tracked joint distances change, providing immediate visual feedback of the sensor data.
+
 ## Depth Limitation
 Raw camera access and raw depth maps are not exposed through the standard Spatial SDK. Depth is approximated using Euclidean distance between tracked joints (Head to Palms) to provide interaction context.
 
