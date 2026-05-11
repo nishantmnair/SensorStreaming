@@ -40,6 +40,10 @@ class SensorStreamingActivity : AppSystemActivity() {
   private var barHeadRight: Entity? = null
   private var barHandHand: Entity? = null
 
+  private var displayedHeadLeft = 0.5f
+  private var displayedHeadRight = 0.5f
+  private var displayedHandHand = 0.5f
+
   // Sensor data manager for structured tracking data
   private val sensorDataManager = SensorDataManager()
 
@@ -87,24 +91,27 @@ class SensorStreamingActivity : AppSystemActivity() {
             listOf(
                 Mesh(Uri.parse("mesh://box")),
                 Material().apply { baseColor = Color4(1f, 0f, 0f, 1f) }, // Red
-                Transform(Pose(Vector3(0.35f, 1.35f, -1.5f))),
-                Box(Vector3(0f, -0.025f, -0.025f), Vector3(0.5f, 0.025f, 0.025f))))
+                Transform(Pose(Vector3(0f, 1.60f, -1.5f))),
+                Scale(Vector3(1f, 1f, 1f)),
+                Box(Vector3(-0.25f, -0.025f, -0.025f), Vector3(0.25f, 0.025f, 0.025f))))
 
     barHeadRight =
         Entity.create(
             listOf(
                 Mesh(Uri.parse("mesh://box")),
                 Material().apply { baseColor = Color4(0f, 1f, 0f, 1f) }, // Green
-                Transform(Pose(Vector3(0.35f, 1.25f, -1.5f))),
-                Box(Vector3(0f, -0.025f, -0.025f), Vector3(0.5f, 0.025f, 0.025f))))
+                Transform(Pose(Vector3(0f, 1.50f, -1.5f))),
+                Scale(Vector3(1f, 1f, 1f)),
+                Box(Vector3(-0.25f, -0.025f, -0.025f), Vector3(0.25f, 0.025f, 0.025f))))
 
     barHandHand =
         Entity.create(
             listOf(
                 Mesh(Uri.parse("mesh://box")),
                 Material().apply { baseColor = Color4(1f, 1f, 0f, 1f) }, // Yellow
-                Transform(Pose(Vector3(0.35f, 1.15f, -1.5f))),
-                Box(Vector3(0f, -0.025f, -0.025f), Vector3(0.5f, 0.025f, 0.025f))))
+                Transform(Pose(Vector3(0f, 1.40f, -1.5f))),
+                Scale(Vector3(1f, 1f, 1f)),
+                Box(Vector3(-0.25f, -0.025f, -0.025f), Vector3(0.25f, 0.025f, 0.025f))))
   }
 
   @OptIn(SpatialSDKExperimentalAPI::class)
@@ -268,30 +275,21 @@ class SensorStreamingActivity : AppSystemActivity() {
 
   /**
    * Simple 3D bar visualization for debug data at a fixed location.
-   * Bars grow/shrink based on computed distances by updating Box dimensions.
+   * Smooths and updates bar scale.
    */
   private fun updateDebugBars(frameData: FrameData) {
-    android.util.Log.d("DEBUG_BARS", "updated bars")
+    displayedHeadLeft = smooth(displayedHeadLeft, frameData.depthEstimate.headToLeftHand)
+    displayedHeadRight = smooth(displayedHeadRight, frameData.depthEstimate.headToRightHand)
+    displayedHandHand = smooth(displayedHandHand, frameData.depthEstimate.handToHand)
 
-    updateBarLength(barHeadLeft, frameData.depthEstimate.headToLeftHand)
-    updateBarLength(barHeadRight, frameData.depthEstimate.headToRightHand)
-    updateBarLength(barHandHand, frameData.depthEstimate.handToHand)
+    barHeadLeft?.setComponent(Scale(Vector3(displayedHeadLeft, 1f, 1f)))
+    barHeadRight?.setComponent(Scale(Vector3(displayedHeadRight, 1f, 1f)))
+    barHandHand?.setComponent(Scale(Vector3(displayedHandHand, 1f, 1f)))
   }
 
-  private fun updateBarLength(entity: Entity?, distance: Float) {
-    val length = distance.coerceIn(0.2f, 0.9f)
-    entity?.setComponent(Box(Vector3(0f, -0.025f, -0.025f), Vector3(length, 0.025f, 0.025f)))
-  }
-
-  private fun createDebugBar(color: Color4): Entity {
-    return Entity.create(
-        listOf(
-            Mesh(Uri.parse("mesh://box")),
-            Material().apply { baseColor = color },
-            Transform(Pose(Vector3(0f, 0f, 0f), Quaternion(0f, 0f, 0f, 1f))),
-            Box(Vector3(0f, -0.025f, -0.025f), Vector3(0.5f, 0.025f, 0.025f))
-        )
-    )
+  private fun smooth(current: Float, targetRaw: Float): Float {
+    val target = targetRaw.coerceIn(0.2f, 1.2f)
+    return current + (target - current) * 0.2f
   }
 
 }
