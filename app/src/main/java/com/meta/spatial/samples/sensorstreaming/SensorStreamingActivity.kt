@@ -86,32 +86,48 @@ class SensorStreamingActivity : AppSystemActivity() {
     scene.setBodyTrackingFidelity(BodyTrackingFidelity.HIGH)
 
     // Create fixed-position debug bars for distance visualization
+    // Legend: Red = Head→Left, Green = Head→Right, Yellow = Hand→Hand
+    // Markers (Legend)
+    createLegendMarker(Color4(1f, 0f, 0f, 1f), Vector3(-0.15f, 1.60f, -1.5f))
+    createLegendMarker(Color4(0f, 1f, 0f, 1f), Vector3(-0.15f, 1.50f, -1.5f))
+    createLegendMarker(Color4(1f, 1f, 0f, 1f), Vector3(-0.15f, 1.40f, -1.5f))
+
+    // Bars: Anchored at X=0, expanding in +X direction
     barHeadLeft =
         Entity.create(
             listOf(
                 Mesh(Uri.parse("mesh://box")),
-                Material().apply { baseColor = Color4(1f, 0f, 0f, 1f) }, // Red
+                Material().apply { baseColor = Color4(1f, 0f, 0f, 1f) },
                 Transform(Pose(Vector3(0f, 1.60f, -1.5f))),
                 Scale(Vector3(1f, 1f, 1f)),
-                Box(Vector3(-0.25f, -0.025f, -0.025f), Vector3(0.25f, 0.025f, 0.025f))))
+                Box(Vector3(0f, -0.025f, -0.025f), Vector3(0.5f, 0.025f, 0.025f))))
 
     barHeadRight =
         Entity.create(
             listOf(
                 Mesh(Uri.parse("mesh://box")),
-                Material().apply { baseColor = Color4(0f, 1f, 0f, 1f) }, // Green
+                Material().apply { baseColor = Color4(0f, 1f, 0f, 1f) },
                 Transform(Pose(Vector3(0f, 1.50f, -1.5f))),
                 Scale(Vector3(1f, 1f, 1f)),
-                Box(Vector3(-0.25f, -0.025f, -0.025f), Vector3(0.25f, 0.025f, 0.025f))))
+                Box(Vector3(0f, -0.025f, -0.025f), Vector3(0.5f, 0.025f, 0.025f))))
 
     barHandHand =
         Entity.create(
             listOf(
                 Mesh(Uri.parse("mesh://box")),
-                Material().apply { baseColor = Color4(1f, 1f, 0f, 1f) }, // Yellow
+                Material().apply { baseColor = Color4(1f, 1f, 0f, 1f) },
                 Transform(Pose(Vector3(0f, 1.40f, -1.5f))),
                 Scale(Vector3(1f, 1f, 1f)),
-                Box(Vector3(-0.25f, -0.025f, -0.025f), Vector3(0.25f, 0.025f, 0.025f))))
+                Box(Vector3(0f, -0.025f, -0.025f), Vector3(0.5f, 0.025f, 0.025f))))
+  }
+
+  private fun createLegendMarker(color: Color4, pos: Vector3) {
+    Entity.create(
+        listOf(
+            Mesh(Uri.parse("mesh://box")),
+            Material().apply { baseColor = color },
+            Transform(Pose(pos)),
+            Box(Vector3(-0.025f, -0.025f, -0.025f), Vector3(0.025f, 0.025f, 0.025f))))
   }
 
   @OptIn(SpatialSDKExperimentalAPI::class)
