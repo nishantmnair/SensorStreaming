@@ -85,49 +85,41 @@ class SensorStreamingActivity : AppSystemActivity() {
     scene.setBodyTrackingJointSet(JointSet.FULL_BODY)
     scene.setBodyTrackingFidelity(BodyTrackingFidelity.HIGH)
 
-    // Create fixed-position debug bars for distance visualization
-    // Legend: Red = Head→Left, Green = Head→Right, Yellow = Hand→Hand
-    // Markers (Legend)
-    createLegendMarker(Color4(1f, 0f, 0f, 1f), Vector3(-0.15f, 1.60f, -1.5f))
-    createLegendMarker(Color4(0f, 1f, 0f, 1f), Vector3(-0.15f, 1.50f, -1.5f))
-    createLegendMarker(Color4(1f, 1f, 0f, 1f), Vector3(-0.15f, 1.40f, -1.5f))
-
-    // Bars: Anchored at X=0, expanding in +X direction
+    // Red = Head to Left Hand distance
+    val redColor = Color4(1f, 0f, 0f, 1f)
+    val redAnchorPos = Vector3(0.35f, 1.60f, -1.5f)
     barHeadLeft =
         Entity.create(
             listOf(
                 Mesh(Uri.parse("mesh://box")),
-                Material().apply { baseColor = Color4(1f, 0f, 0f, 1f) },
-                Transform(Pose(Vector3(0f, 1.60f, -1.5f))),
+                Material().apply { baseColor = redColor },
+                Transform(Pose(redAnchorPos)),
                 Scale(Vector3(1f, 1f, 1f)),
-                Box(Vector3(0f, -0.025f, -0.025f), Vector3(0.5f, 0.025f, 0.025f))))
+                Box(Vector3(-0.5f, -0.025f, -0.025f), Vector3(0f, 0.025f, 0.025f))))
 
+    // Green = Head to Right Hand distance
+    val greenColor = Color4(0f, 1f, 0f, 1f)
+    val greenAnchorPos = Vector3(0.35f, 1.50f, -1.5f)
     barHeadRight =
         Entity.create(
             listOf(
                 Mesh(Uri.parse("mesh://box")),
-                Material().apply { baseColor = Color4(0f, 1f, 0f, 1f) },
-                Transform(Pose(Vector3(0f, 1.50f, -1.5f))),
+                Material().apply { baseColor = greenColor },
+                Transform(Pose(greenAnchorPos)),
                 Scale(Vector3(1f, 1f, 1f)),
-                Box(Vector3(0f, -0.025f, -0.025f), Vector3(0.5f, 0.025f, 0.025f))))
+                Box(Vector3(-0.5f, -0.025f, -0.025f), Vector3(0f, 0.025f, 0.025f))))
 
+    // Yellow = Hand to Hand distance
+    val yellowColor = Color4(1f, 1f, 0f, 1f)
+    val yellowAnchorPos = Vector3(0.35f, 1.40f, -1.5f)
     barHandHand =
         Entity.create(
             listOf(
                 Mesh(Uri.parse("mesh://box")),
-                Material().apply { baseColor = Color4(1f, 1f, 0f, 1f) },
-                Transform(Pose(Vector3(0f, 1.40f, -1.5f))),
+                Material().apply { baseColor = yellowColor },
+                Transform(Pose(yellowAnchorPos)),
                 Scale(Vector3(1f, 1f, 1f)),
-                Box(Vector3(0f, -0.025f, -0.025f), Vector3(0.5f, 0.025f, 0.025f))))
-  }
-
-  private fun createLegendMarker(color: Color4, pos: Vector3) {
-    Entity.create(
-        listOf(
-            Mesh(Uri.parse("mesh://box")),
-            Material().apply { baseColor = color },
-            Transform(Pose(pos)),
-            Box(Vector3(-0.025f, -0.025f, -0.025f), Vector3(0.025f, 0.025f, 0.025f))))
+                Box(Vector3(-0.5f, -0.025f, -0.025f), Vector3(0f, 0.025f, 0.025f))))
   }
 
   @OptIn(SpatialSDKExperimentalAPI::class)
